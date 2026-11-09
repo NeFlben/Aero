@@ -1,0 +1,186 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Daylight apron: cool off-white, anthracite ink, one aviation blue. */
+:root {
+  --bg: #eef2fb;
+  --surface: #ffffff;
+  --surface-2: #f1f4fa;
+  --glass: rgb(255 255 255 / 0.72);
+  --glass-line: rgb(255 255 255 / 0.9);
+  --ink: #0d1330;
+  --ink-2: #4a5275;
+  --ink-3: #8189a6;
+  --line: #e3e8f3;
+  --line-strong: #cbd3e5;
+  --accent: #4f46e5;
+  --accent-2: #0ea5e9;
+  --accent-hover: #4338ca;
+  --accent-soft: #eceafe;
+  --on-accent: #ffffff;
+  --pos: #059669;
+  --neg: #e11d48;
+  --signal: #b45309;
+  --sil: #b9c2da;
+  --sil-bg: linear-gradient(160deg, #e6ecfb 0%, #f4f6fc 55%, #e9e6fb 100%);
+  --board: #0b1026;
+  --board-2: #161d3d;
+  --board-ink: #f3f4ff;
+  --board-dim: #9aa2c7;
+  --flap: #fbbf24;
+  --c1: #6366f1; --c2: #0ea5e9; --c3: #14b8a6; --c4: #f59e0b; --c5: #f43f5e; --c6: #a855f7;
+  --shadow-sm: 0 1px 2px rgb(30 41 99 / 0.05), 0 8px 24px -12px rgb(30 41 99 / 0.12);
+  --shadow: 0 2px 6px rgb(30 41 99 / 0.06), 0 24px 60px -24px rgb(30 41 99 / 0.30);
+  --sky:
+    radial-gradient(60vw 50vh at 8% -10%, rgb(129 140 248 / 0.28), transparent 70%),
+    radial-gradient(50vw 45vh at 100% 0%, rgb(56 189 248 / 0.22), transparent 70%),
+    radial-gradient(60vw 60vh at 60% 110%, rgb(244 114 182 / 0.10), transparent 70%);
+}
+
+[data-theme="dark"] {
+  --bg: #070a1a;
+  --surface: #0f1430;
+  --surface-2: #171e40;
+  --glass: rgb(17 23 52 / 0.68);
+  --glass-line: rgb(255 255 255 / 0.07);
+  --ink: #eef0ff;
+  --ink-2: #a6add0;
+  --ink-3: #6f77a0;
+  --line: #1d2550;
+  --line-strong: #2c366a;
+  --accent: #8b8cff;
+  --accent-2: #38bdf8;
+  --accent-hover: #a5a6ff;
+  --accent-soft: #1d1f4d;
+  --on-accent: #0b0d2a;
+  --pos: #34d399;
+  --neg: #fb7185;
+  --signal: #fbbf24;
+  --sil: #333c6b;
+  --sil-bg: linear-gradient(160deg, #141a3a 0%, #0f1430 55%, #1a1640 100%);
+  --board: #050817;
+  --board-2: #10163a;
+  --c1: #818cf8; --c2: #38bdf8; --c3: #2dd4bf; --c4: #fbbf24; --c5: #fb7185; --c6: #c084fc;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 30px -14px rgb(0 0 0 / 0.6);
+  --shadow: 0 2px 6px rgb(0 0 0 / 0.4), 0 30px 70px -26px rgb(0 0 0 / 0.85);
+  --sky:
+    radial-gradient(60vw 50vh at 8% -10%, rgb(99 102 241 / 0.30), transparent 70%),
+    radial-gradient(50vw 45vh at 100% 0%, rgb(14 165 233 / 0.18), transparent 70%),
+    radial-gradient(60vw 60vh at 60% 110%, rgb(168 85 247 / 0.14), transparent 70%);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-2: var(--accent-2);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-pos: var(--pos);
+  --color-neg: var(--neg);
+  --color-signal: var(--signal);
+  --color-board: var(--board);
+  --color-board-2: var(--board-2);
+  --color-board-ink: var(--board-ink);
+  --color-board-dim: var(--board-dim);
+  --color-flap: var(--flap);
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jb-mono), ui-monospace, monospace;
+}
+
+html { color-scheme: light; }
+html[data-theme="dark"] { color-scheme: dark; }
+body {
+  background: var(--sky), var(--bg);
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+/* Fixed backgrounds repaint on every scroll frame on phones (and iOS ignores them). */
+@media (hover: none), (max-width: 767px) { body { background-attachment: scroll; } }
+a, button, [role="button"], input, select, textarea, label { touch-action: manipulation; }
+html { scroll-padding-top: 88px; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+::selection { background: var(--accent-soft); }
+
+/* The codes: registrations, ICAO, item numbers, always in the same technical voice. */
+.code { font-family: var(--font-mono); font-feature-settings: "zero" 1; letter-spacing: 0.01em; }
+.eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-3); }
+.num { font-variant-numeric: tabular-nums; }
+
+dialog::backdrop { background: rgb(8 11 14 / 0.5); }
+dialog { color: inherit; }
+
+.skeleton { background: linear-gradient(90deg, var(--surface-2) 25%, var(--line) 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+/* Glass surfaces: every card and panel. */
+.card {
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
+  border-radius: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+}
+.grad { background-image: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+.grad-text { background-image: linear-gradient(120deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.lift { transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s; }
+@media (hover: hover) { .lift:hover { transform: translateY(-3px); box-shadow: var(--shadow); } }
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Collection Highlight: a calm marker, held for a few seconds, then released. */
+.highlighted { position: relative; z-index: 2; animation: marked 4.5s ease-out both; }
+@keyframes marked {
+  0% { box-shadow: 0 0 0 0 var(--accent); transform: scale(1); }
+  6%, 80% { box-shadow: 0 0 0 2px var(--accent), 0 0 0 7px var(--accent-soft); transform: scale(1.015); }
+  100% { box-shadow: 0 0 0 0 transparent; transform: scale(1); }
+}
+
+/* Dashboard hero: a faint runway-light glow and a fine grid, so the dark board has depth. */
+.hero-glow {
+  background:
+    radial-gradient(60% 80% at 0% 0%, rgb(242 182 50 / 0.10), transparent 60%),
+    radial-gradient(50% 70% at 100% 100%, rgb(70 130 220 / 0.12), transparent 65%),
+    linear-gradient(rgb(255 255 255 / 0.025) 1px, transparent 1px) 0 0 / 100% 32px;
+  mask-image: linear-gradient(180deg, #000, rgb(0 0 0 / 0.6));
+}
+
+/* Aviation Roulette. The strip blurs while it is fast and sharpens as it brakes (duration set inline). */
+.reel-blur { animation: reelblur linear both; }
+@keyframes reelblur {
+  0% { filter: blur(0); }
+  6%, 38% { filter: blur(2.5px); }
+  70%, 100% { filter: blur(0); }
+}
+/* The result card settles in; registration characters flip down like a departure board. */
+.reveal { animation: reveal 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes reveal { from { opacity: 0; transform: scale(0.97) translateY(6px); } }
+.flap { animation: flap 380ms cubic-bezier(0.3, 1.4, 0.5, 1) both; transform-origin: 50% 0; }
+@keyframes flap { from { opacity: 0; transform: perspective(200px) rotateX(-85deg); } }
+
+.fade-in { animation: fadein 160ms ease-out both; }
+@keyframes fadein { from { opacity: 0; transform: translateY(3px); } }
+
+.scroll-thin { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; scroll-behavior: auto !important; }
+  .highlighted { animation: none; box-shadow: 0 0 0 2px var(--accent), 0 0 0 7px var(--accent-soft); }
+}
