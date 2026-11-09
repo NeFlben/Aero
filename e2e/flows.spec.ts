@@ -11,8 +11,16 @@ async function register(page: Page, tag: string) {
   await page.getByLabel("Name").fill(a.name);
   await page.getByLabel("Email").fill(a.email);
   await page.getByLabel("Password").fill(a.password);
-  await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page.getByRole("heading", { name: "Your collection, at a glance." })).toBeVisible();
+  const home = page.getByRole("heading", { name: "Your collection, at a glance." });
+  const limited = page.getByText("Too many attempts. Please wait a minute.");
+  // Sign-up allows 5 per minute; the suite creates more accounts than that, so it waits out the window.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await page.getByRole("button", { name: "Create account" }).click();
+    await expect(home.or(limited)).toBeVisible();
+    if (await home.isVisible()) return a;
+    await page.waitForTimeout(61_000);
+  }
+  await expect(home).toBeVisible();
   return a;
 }
 
@@ -108,9 +116,9 @@ test("picker highlight mode finds a model outside the current filter", async ({ 
     await p.getByRole("button", { name: "1:500", exact: true }).click();
   });
   await page.goto("/collection");
+  // Opening the picker spins at once, in the mode chosen last time; the choice is remembered.
+  await page.evaluate(() => localStorage.setItem("hangar:picker-mode", "highlight"));
   await page.getByRole("button", { name: "Pick Random Aircraft" }).click();
-  await page.getByRole("button", { name: "Collection Highlight" }).click();
-  await page.getByRole("button", { name: "Spin" }).click();
   await expect(page.locator(".highlighted")).toBeVisible({ timeout: 8000 });
 });
 

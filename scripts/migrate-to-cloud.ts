@@ -1,12 +1,12 @@
 /**
  * Moves the local Hangar (PGlite in PGLITE_DATA_DIR, photos in UPLOAD_DIR) to hosted PostgreSQL and
- * an S3-compatible bucket, and gives the collection's owner an email + password for the login.
+ * a private Vercel Blob store, and gives the collection's owner an email + password for the login.
  *
  * Stop the dev server and Hangar.exe first (PGlite allows one process). Then, in PowerShell:
  *
  *   $env:TARGET_DATABASE_URL="postgres://…"      # Neon connection string
  *   $env:OWNER_EMAIL="you@example.com"; $env:OWNER_PASSWORD="…"  # your future login
- *   $env:S3_ENDPOINT="…"; $env:S3_BUCKET="…"; $env:S3_ACCESS_KEY_ID="…"; $env:S3_SECRET_ACCESS_KEY="…"
+ *   $env:BLOB_READ_WRITE_TOKEN="vercel_blob_rw_…"  # from the Vercel Blob store
  *   npx tsx scripts/migrate-to-cloud.ts
  *
  * Safe to run again: rows that already exist are skipped, photos already in the bucket are not re-sent.
@@ -15,7 +15,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { PGlite } from "@electric-sql/pglite";
-import { AwsClient } from "aws4fetch";
+import { head, put } from "@vercel/blob";
 import { hashPassword } from "better-auth/crypto";
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
@@ -114,14 +114,11 @@ async function main() {
 
   // Photos.
   const uploads = path.resolve(process.env.UPLOAD_DIR ?? ".data/uploads");
-  const { S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY } = process.env;
   if (!fs.existsSync(uploads)) {
     console.log("• No local photos.");
-  } else if (!S3_ENDPOINT || !S3_BUCKET || !S3_ACCESS_KEY_ID || !S3_SECRET_ACCESS_KEY) {
-    console.log("• S3_* not set: photos were not copied. Run again with the bucket settings to copy them.");
+  } else if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    console.log("• BLOB_READ_WRITE_TOKEN not set: photos were not copied. Run again with it to copy them.");
   } else {
-    const s3 = new AwsClient({ accessKeyId: S3_ACCESS_KEY_ID, secretAccessKey: S3_SECRET_ACCESS_KEY, region: process.env.S3_REGION ?? "auto", service: "s3" });
-    const base = `${S3_ENDPOINT.replace(/\/$/, "")}/${S3_BUCKET}`;
     const files: string[] = [];
     const walk = (dir: string) => {
       for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -138,15 +135,13 @@ async function main() {
     const worker = async () => {
       for (let f = queue.shift(); f; f = queue.shift()) {
         const key = path.relative(uploads, f).split(path.sep).join("/");
-        const url = `${base}/${key}`;
         try {
-          if ((await s3.fetch(url, { method: "HEAD" })).ok) {
+          if (await head(key).then(() => true, () => false)) {
             skipped++;
             continue;
           }
-          const r = await s3.fetch(url, { method: "PUT", body: new Uint8Array(fs.readFileSync(f)), headers: { "content-type": "image/webp" } });
-          if (r.ok) sent++;
-          else failed++;
+          await put(key, fs.readFileSync(f), { access: "private", contentType: "image/webp", addRandomSuffix: false, allowOverwrite: true });
+          sent++;
         } catch {
           failed++;
         }

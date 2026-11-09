@@ -22,7 +22,7 @@ PGlite allows one process at a time, so stop the dev server before running seed 
 
 ## Online (PC + phone)
 
-Step-by-step guide (German) for Neon + Cloudflare R2 + Vercel, moving the local collection over and installing the app on a phone: [DEPLOY.md](DEPLOY.md). Hangar is a PWA: installable, opens offline with the last loaded state, and scans box barcodes (EAN) for duplicate checks.
+Step-by-step guide (German) for Neon + Vercel (with Vercel Blob for photos), moving the local collection over and installing the app on a phone: [DEPLOY.md](DEPLOY.md). Hangar is a PWA: installable, opens offline with the last loaded state, and scans box barcodes (EAN) for duplicate checks.
 
 ## Desktop app (Windows)
 
@@ -45,7 +45,7 @@ Everything is optional locally. See `.env.example`.
 | `HANGAR_SIGNUP` | open | `off` closes registration, only existing accounts can sign in |
 | `CRON_SECRET` | Market prices refresh on a timer in the server process | Serverless: refresh via `GET /api/cron/market` with `Authorization: Bearer …` |
 | `SMTP_URL`, `MAIL_FROM` | Password reset links are printed in the server log | Real email |
-| `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Images in `.data/uploads` | Any S3-compatible bucket (R2, B2, …) |
+| `BLOB_READ_WRITE_TOKEN` | Images in `.data/uploads` | Images in a private Vercel Blob store |
 | `ADMIN_EMAILS` | No moderators | Comma-separated accounts that can verify and reject catalog entries |
 
 Exchange rates come from frankfurter.dev (ECB, no key). If unreachable, the last stored rates are used; without any rates, foreign amounts stay out of the totals and the dashboard says so.
