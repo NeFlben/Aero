@@ -45,7 +45,7 @@ git push -u origin main
 | `HANGAR_SIGNUP` | `off` (niemand außer dir kann ein Konto anlegen) |
 | `BETTER_AUTH_SECRET` | langer Zufallswert, siehe unten |
 | `CRON_SECRET` | langer Zufallswert, siehe unten |
-| optional `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`, `EBAY_MARKETPLACE`, `PLANESPOTTERS_CONTACT`, `SERPER_API_KEY` | wie in `.env.local` |
+| optional `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`, `EBAY_MARKETPLACE`, `PLANESPOTTERS_CONTACT`, `SERPER_API_KEY`, `ANTHROPIC_API_KEY` (Box-Foto-Erkennung) | wie in `.env.local` |
 
    Zufallswert erzeugen (PowerShell): `[Convert]::ToBase64String((1..32 | % { Get-Random -Max 256 }))`
 

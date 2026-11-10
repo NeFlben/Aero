@@ -1,14 +1,16 @@
 "use client";
 
-import { ArrowLeft, BadgeCheck, CircleHelp, Copy, ScanBarcode, Search, Sparkles } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Camera, CircleHelp, Copy, ScanBarcode, Search, Sparkles, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { resolveBoxReading, type BoxReading } from "@/lib/boxScan";
 import { useI18n } from "@/lib/i18n";
-import { findDuplicates, normBarcode, parseSmartQuery } from "@/lib/smart";
+import { compact, findDuplicates, normBarcode, parseSmartQuery } from "@/lib/smart";
 import { aircraftLabel, type Item, type ItemInput, type ReleaseRef } from "@/lib/types";
 import { api, ApiError, useApp } from "./AppProvider";
 import { blankForm, formFromItem, formToInput, ItemForm, LIVERY_LABEL, type FormState } from "./ItemForm";
 import { BarcodeScanner, cameraAvailable } from "./BarcodeScanner";
+import { BoxScanProgress, prepareBoxFiles, useBoxScanEnabled } from "./BoxScan";
 import { ImageOrSilhouette } from "./ModelImage";
 import { PhotoStager } from "./PhotoStager";
 import { Button, btnClass, cx, Dialog, Flag, IconClose, Reg } from "./ui";
@@ -71,6 +73,13 @@ function AddFlow({ seed }: { seed: ReturnType<typeof useApp>["addSeed"] }) {
   const [photos, setPhotos] = useState<File[]>([]);
   const [draftFound, setDraftFound] = useState<FormState | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
+  const [unsureFrom, setUnsureFrom] = useState<"search" | "photo">("search");
+  const [boxBusy, setBoxBusy] = useState<File[] | null>(null);
+  // Shown in the dialog: a toast would sit behind the modal.
+  const [boxError, setBoxError] = useState<string | null>(null);
+  const [scanInfo, setScanInfo] = useState<{ filled: number; warnings: string[]; release: ReleaseRef | null } | null>(null);
+  const boxOn = useBoxScanEnabled();
+  const boxInput = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -111,13 +120,16 @@ function AddFlow({ seed }: { seed: ReturnType<typeof useApp>["addSeed"] }) {
     };
   }, [q]);
 
-  const open = useCallback((partial: Partial<ItemInput>, uncertain: string[] = []) => {
+  const open = useCallback((partial: Partial<ItemInput>, uncertain: string[] = [], from: "search" | "photo" = "search") => {
     const last = store.get<{ maker?: string; scale?: string }>(LAST_KEY);
     const f = formFromItem({ purchaseDate: new Date().toLocaleDateString("sv"), ...partial }, user.baseCurrency, locale);
     f.modelManufacturerName ||= last?.maker ?? "";
-    f.scale ||= last?.scale ?? "";
+    // A box that shows no scale must not silently inherit the last one.
+    if (from === "search") f.scale ||= last?.scale ?? "";
     setForm(f);
     setUnsure(new Set(uncertain));
+    setUnsureFrom(from);
+    if (from === "search") setScanInfo(null);
     setErrors({});
     setStep("form");
   }, [user.baseCurrency, locale]);
@@ -241,6 +253,96 @@ function AddFlow({ seed }: { seed: ReturnType<typeof useApp>["addSeed"] }) {
     toast(t("Not in your collection yet. Fill in the rest."));
   };
 
+  /**
+   * Photos of a box → what is printed on it → reference names and ids → catalog release if one
+   * matches → duplicate check → a prefilled form with every uncertain field marked.
+   */
+  const scanBox = async (list: FileList | File[] | null | undefined) => {
+    const files = Array.from(list ?? []).filter((f) => f.type.startsWith("image/") || f.type === "").slice(0, 4);
+    if (!files.length || !ref || boxBusy) return;
+    setBoxBusy(files);
+    setBoxError(null);
+    try {
+      const { upload, barcode } = await prepareBoxFiles(files);
+      const fd = new FormData();
+      for (const f of upload) fd.append("file", f);
+      fd.set("lang", locale);
+      const { reading } = await api<{ reading: BoxReading }>("/api/box-scan", { method: "POST", body: fd });
+      if (!reading.isModelBox) {
+        setBoxError(t("This does not look like a model box. Try another photo."));
+        return;
+      }
+      const r = resolveBoxReading(reading, ref, barcode);
+      let input = r.input;
+      let unsureKeys = r.unsure;
+
+      // A catalog release with the same barcode, or the same brand and item number, is better data than a reading.
+      let release: ReleaseRef | null = null;
+      for (const key of [input.barcode, input.itemNumber].filter(Boolean) as string[]) {
+        const found: ReleaseRef[] = await fetch(`/api/catalog?q=${encodeURIComponent(key)}`)
+          .then((x) => (x.ok ? x.json() : { releases: [] }))
+          .then((x: { releases?: ReleaseRef[] }) => x.releases ?? [])
+          .catch(() => []);
+        release = found.find((x) =>
+          (input.barcode && x.barcode && normBarcode(x.barcode) === input.barcode) ||
+          (input.itemNumber && x.itemNumber && compact(x.itemNumber) === compact(input.itemNumber) && compact(x.modelManufacturerName) === compact(input.modelManufacturerName ?? "")),
+        ) ?? null;
+        if (release) break;
+      }
+      if (release) {
+        const rel = release;
+        const fromRelease: Partial<ItemInput> = {
+          releaseId: rel.id, airlineId: rel.airlineId, airlineName: rel.airlineName, aircraftTypeId: rel.aircraftTypeId, aircraftName: rel.aircraftName, modelManufacturerName: rel.modelManufacturerName,
+          scale: rel.scale, registration: rel.registration, itemNumber: rel.itemNumber, barcode: rel.barcode, liveryCategory: rel.liveryCategory, liveryName: rel.liveryName,
+          countryCode: ref.airlines.find((a) => a.id === rel.airlineId)?.country ?? input.countryCode ?? null,
+        };
+        const kept = Object.fromEntries(Object.entries(fromRelease).filter(([, v]) => v !== null && v !== undefined && v !== ""));
+        input = { ...input, ...kept };
+        // A verified release settles the fields it carries.
+        if (rel.status === "verified") unsureKeys = unsureKeys.filter((k) => !(k in kept));
+      }
+
+      setPhotos(upload);
+      setScanInfo({ filled: r.filled, warnings: r.warnings.map((w) => (w === "barcode_checksum" ? t("The barcode digits could not be confirmed and were left out.") : w)), release });
+      open(input, unsureKeys, "photo");
+
+      const mine = findDuplicates(
+        { airlineName: input.airlineName ?? null, aircraftName: input.aircraftName ?? "", modelManufacturerName: input.modelManufacturerName ?? "", scale: input.scale ?? null, registration: input.registration ?? null, itemNumber: input.itemNumber ?? null, liveryName: input.liveryName ?? null, barcode: input.barcode ?? null },
+        items ?? [],
+      );
+      if (mine.length) setDupes(mine);
+    } catch (e) {
+      const code = e instanceof ApiError ? e.code : "";
+      setBoxError(
+        code === "rate_limited" ? t("Too many requests. Please wait a moment.")
+          : code === "box_scan_off" ? t("Photo recognition is not set up on the server.")
+          : code === "unreadable" ? t("The box could not be read. Try a sharper photo with the label in view.")
+          : code === "too_large" ? t("The photo is too large.")
+          : t("The photo could not be read. Please try again."),
+      );
+    } finally {
+      setBoxBusy(null);
+    }
+  };
+
+  // Ctrl+V of a box photo on the search screen starts the reading.
+  const scanRef = useRef(scanBox);
+  useEffect(() => {
+    scanRef.current = scanBox;
+  });
+  useEffect(() => {
+    if (step !== "search" || !boxOn) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const imgs = Array.from(e.clipboardData?.files ?? []).filter((f) => f.type.startsWith("image/"));
+      if (imgs.length) {
+        e.preventDefault();
+        void scanRef.current(imgs);
+      }
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [step, boxOn]);
+
   if (dupes) {
     const d = dupes[0];
     return (
@@ -274,8 +376,22 @@ function AddFlow({ seed }: { seed: ReturnType<typeof useApp>["addSeed"] }) {
           <IconClose onClick={closeAdd} label={t("Close")} />
         </div>
         <div className="scroll-thin flex-1 overflow-y-auto p-4 sm:p-5">
+          {scanInfo && (
+            <div className="fade-in mb-4 rounded-2xl border border-line bg-surface-2 px-3.5 py-3 text-[13px]">
+              <p className="flex items-center gap-2 font-semibold">
+                <Camera className="size-4 shrink-0 text-accent" />
+                {scanInfo.release
+                  ? (scanInfo.release.status === "verified" ? t("Read from the box and found in the catalog (verified).") : t("Read from the box and found in the catalog (unverified)."))
+                  : t("{n} fields read from the box.", { n: scanInfo.filled })}
+              </p>
+              {unsure.size > 0 && <p className="mt-1 text-ink-2">{t("Marked fields were hard to read or deduced. Please check them.")}</p>}
+              {scanInfo.warnings.map((w) => (
+                <p key={w} className="mt-1 flex items-start gap-1.5 text-signal"><TriangleAlert className="mt-0.5 size-3.5 shrink-0" />{w}</p>
+              ))}
+            </div>
+          )}
           <PhotoStager files={photos} setFiles={setPhotos} query={[form.modelManufacturerName, form.itemNumber, form.scale, form.airlineName, form.aircraftName, form.registration].map((x) => x.trim()).filter(Boolean).join(" ")} alt={[form.registration.trim(), [form.airlineName, form.aircraftName].map((x) => x.trim()).filter(Boolean).join(" ")].filter(Boolean)} />
-          <ItemForm form={form} set={set} errors={errors} unsure={unsure} compact />
+          <ItemForm form={form} set={set} errors={errors} unsure={unsure} unsureFrom={unsureFrom} compact />
         </div>
         <div className="flex flex-wrap justify-end gap-2 border-t border-line px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] max-sm:grid max-sm:grid-cols-[auto_1fr] max-sm:[&>[type=submit]]:col-span-2">
           <Button variant="ghost" onClick={() => { store.set(DRAFT_KEY, null); closeAdd(); }}>{t("Discard")}</Button>
@@ -283,6 +399,18 @@ function AddFlow({ seed }: { seed: ReturnType<typeof useApp>["addSeed"] }) {
           <Button type="submit" variant="primary" disabled={saving}>{isCollection ? t("Add to Collection") : t("Add to Wishlist")}</Button>
         </div>
       </form>
+    );
+  }
+
+  if (boxBusy) {
+    return (
+      <div className="flex max-h-[80dvh] flex-col max-md:h-dvh max-md:max-h-dvh">
+        <div className="flex items-start justify-between gap-2 px-5 pt-5">
+          <h2 className="text-xl font-semibold tracking-tight">{t("Reading your box")}</h2>
+          <IconClose onClick={closeAdd} label={t("Close")} />
+        </div>
+        <div className="flex flex-1 items-center justify-center"><BoxScanProgress files={boxBusy} /></div>
+      </div>
     );
   }
 
@@ -320,8 +448,24 @@ function AddFlow({ seed }: { seed: ReturnType<typeof useApp>["addSeed"] }) {
               className="h-12 w-full rounded-md border border-line-strong bg-surface pr-3 pl-9 text-[15px] placeholder:text-ink-3 focus:border-accent focus:ring-1 focus:ring-accent focus:outline-none max-md:text-base"
             />
           </div>
+          {boxOn && <Button className="h-12 w-12 shrink-0 px-0" aria-label={t("Photo of the box")} title={t("Photo of the box")} onClick={() => boxInput.current?.click()}><Camera className="size-5" /></Button>}
           {hasCamera && <Button className="h-12 w-12 shrink-0 px-0" aria-label={t("Scan barcode")} title={t("Scan barcode")} onClick={() => setScanOpen(true)}><ScanBarcode className="size-5" /></Button>}
         </div>
+        <input ref={boxInput} type="file" accept="image/*" multiple hidden aria-label={t("Photo of the box")} onChange={(e) => { void scanBox(e.target.files); e.target.value = ""; }} />
+        {boxError && (
+          <p role="alert" className="fade-in mt-3 flex items-start gap-2 rounded-2xl bg-surface-2 px-3.5 py-2.5 text-[13px] text-neg">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" />{boxError}
+          </p>
+        )}
+        {boxOn && !q.trim() && !draftFound && (
+          <button type="button" onClick={() => boxInput.current?.click()} className="mt-3 flex w-full items-center gap-3 rounded-2xl border border-dashed border-line-strong px-4 py-3 text-left transition-colors hover:border-accent hover:bg-accent-soft">
+            <span className="grad grid size-10 shrink-0 place-items-center rounded-full text-white"><Camera className="size-5" /></span>
+            <span className="min-w-0">
+              <span className="block font-semibold">{t("Take a photo of the box")}</span>
+              <span className="block text-[12.5px] text-ink-2">{t("Brand, item number, scale, airline, type, registration and livery are read and filled in. Up to 4 photos, e.g. front and side label.")}</span>
+            </span>
+          </button>
+        )}
         {draftFound && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface-2 px-3 py-2 text-[13px]">
             <span>{t("Continue your unsaved entry: {name}", { name: [draftFound.airlineName, draftFound.aircraftName].filter(Boolean).join(" · ") })}</span>

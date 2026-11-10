@@ -47,6 +47,7 @@ Everything is optional locally. See `.env.example`.
 | `SMTP_URL`, `MAIL_FROM` | Password reset links are printed in the server log | Real email |
 | `BLOB_READ_WRITE_TOKEN` | Images in `.data/uploads` | Images in a private Vercel Blob store |
 | `ADMIN_EMAILS` | No moderators | Comma-separated accounts that can verify and reject catalog entries |
+| `ANTHROPIC_API_KEY` | No box photo button | "Take a photo of the box" reads the packaging with Claude (`claude-opus-5-5`) and fills the form |
 
 Exchange rates come from frankfurter.dev (ECB, no key). If unreachable, the last stored rates are used; without any rates, foreign amounts stay out of the totals and the dashboard says so.
 
@@ -100,9 +101,15 @@ Every item query takes the owner's id (`src/server/items.ts`). Inputs are valida
 
 The in-process rate limiter counts per server instance. With several instances, replace it with a shared store.
 
+## Box photo recognition
+
+With `ANTHROPIC_API_KEY` set, Add Aircraft offers "Take a photo of the box" (also Ctrl+V of a photo on the search screen). Up to four photos of one box go to `POST /api/box-scan`, are re-encoded through sharp (EXIF removed) and read by Claude with a structured JSON answer (`src/server/boxScan.ts`). Nothing is stored on the server.
+
+`src/lib/boxScan.ts` then maps the reading onto reference data: brand, airline and type get their canonical names and ids, registrations are formatted, the scale normalised. A barcode decoded locally from the photo (ZXing) beats the model's reading, and every barcode must pass its check digit. Following the catalog rule above, item numbers, registrations and barcodes are only taken when printed on the box, never inferred. A catalog release with the same barcode, or the same brand and item number, fills in the rest; the duplicate check runs as usual. Fields that were hard to read or deduced are marked in the form, and the box photos are staged as the model's photos (removable before saving).
+
 ## Not in this version
 
-- OCR and AI extraction from photos. Barcode scanning is built with the browser's `BarcodeDetector` (the button is hidden where unsupported); it only finds a release once the catalog holds that barcode.
+- OCR and AI extraction from photos of the model itself (box photos are covered above). Barcode scanning is built with the browser's `BarcodeDetector` (the button is hidden where unsupported); it only finds a release once the catalog holds that barcode.
 - Automatic market value lookup. `value_history.source` is ready for it.
 - Background removal and purchase receipt uploads.
 - Community tools: merging exists as a moderator API without a UI, and reports are stored without a review screen.

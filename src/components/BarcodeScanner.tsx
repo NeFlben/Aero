@@ -9,7 +9,7 @@ import { Button, Dialog, IconClose, Input } from "./ui";
 const FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"];
 
 interface Detector {
-  detect(source: HTMLVideoElement): Promise<{ rawValue: string }[]>;
+  detect(source: HTMLVideoElement | ImageBitmap): Promise<{ rawValue: string }[]>;
 }
 
 /**
@@ -17,7 +17,7 @@ interface Detector {
  * backed by ZXing in WebAssembly (iPhone, desktop). The .wasm file is served from /vendor, so no
  * third-party CDN is contacted.
  */
-async function createDetector(): Promise<Detector> {
+export async function createDetector(): Promise<Detector> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const Native = (globalThis as any).BarcodeDetector;
   if (Native) {
