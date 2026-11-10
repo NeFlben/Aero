@@ -3,7 +3,7 @@ import { AIRCRAFT_TYPES, AIRLINES, MODEL_MANUFACTURERS } from "../src/data/refer
 import { analyzeRows, guessMapping, normalizeDate } from "../src/lib/importer";
 import { aircraftOfTheDay, buildReel, pickRandom, reelDelays } from "../src/lib/picker";
 import { applyFilters, buildIndex, emptyFilters, searchItems } from "../src/lib/search";
-import { findDuplicates, formatRegistration, isDuplicate, normBarcode, normalizeScale, parseSmartQuery, registrationCountry, searchAircraft } from "../src/lib/smart";
+import { findDuplicates, formatRegistration, isDuplicate, normBarcode, normalizeScale, parseSmartQuery, registrationCountry, searchAircraft, validGtin } from "../src/lib/smart";
 import { computeStats, convert, parseMoney } from "../src/lib/stats";
 import type { Item, Reference } from "../src/lib/types";
 
@@ -133,6 +133,12 @@ describe("duplicates", () => {
   it("same barcode is a duplicate even with other details", () => expect(isDuplicate({ ...a, barcode: "4013150523456" }, { ...a, modelManufacturerName: "Other", itemNumber: "Z9", barcode: "4013150523456" })).toBe(true));
   it("different barcodes are not, even with the same item number", () => expect(isDuplicate({ ...a, barcode: "4013150523456" }, { ...a, barcode: "4013150523463" })).toBe(false));
   it("UPC-A equals its EAN-13 form", () => expect(normBarcode("013150523456")).toBe(normBarcode("0013150523456")));
+  it("accepts only correct EAN check digits", () => {
+    expect(validGtin("4006381333931")).toBe(true);
+    expect(validGtin("96385074")).toBe(true);
+    expect(validGtin("4006381333932")).toBe(false);
+    expect(validGtin("123456")).toBe(false);
+  });
   it("no item numbers: full match needed", () => {
     const n = { ...a, itemNumber: null };
     expect(isDuplicate(n, { ...n })).toBe(true);

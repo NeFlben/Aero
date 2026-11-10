@@ -283,6 +283,15 @@ export const normBarcode = (s: string | null | undefined) => {
   return d.length === 12 ? `0${d}` : d;
 };
 
+/** EAN-8 / EAN-13 (UPC-A as EAN-13) check digit, so a scan with a correct check digit counts at once. */
+export const validGtin = (code: string) => {
+  if (!/^(\d{8}|\d{13})$/.test(code)) return false;
+  const digits = [...code].map(Number);
+  const check = digits.pop()!;
+  const sum = digits.reverse().reduce((s, d, i) => s + d * (i % 2 === 0 ? 3 : 1), 0);
+  return (10 - (sum % 10)) % 10 === check;
+};
+
 /**
  * A same registration alone is NOT a duplicate. A barcode on both sides decides alone; otherwise two rules:
  * - same manufacturer + same item number + same scale (when both sides have it), or
