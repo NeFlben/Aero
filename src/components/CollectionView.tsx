@@ -169,19 +169,22 @@ export function CollectionView() {
       ) : (
         <>
           <div className="z-10 -mx-4 mb-3 flex flex-wrap items-center gap-2 px-4 py-2 md:sticky md:top-0 md:-mx-7 md:bg-bg/95 md:px-7 md:backdrop-blur">
-            <div className="relative min-w-[200px] flex-1">
-              <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-ink-3" />
-              <Input aria-label={t("Search your collection")} value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Search your collection")} className={cx("pl-8", hasCamera && "pr-16")} />
+            {/* Phone: the search takes its own row; the controls share the row below. */}
+            <div className="relative min-w-0 basis-full sm:min-w-[200px] sm:basis-0 sm:flex-1">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" />
+              {/* Right padding reserves room for the clear and scan buttons so typed text never runs under them. */}
+              <Input type="search" enterKeyHint="search" aria-label={t("Search your collection")} value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Search your collection")} className={cx("truncate pl-9 [&::-webkit-search-cancel-button]:appearance-none", q && hasCamera ? "pr-[76px]" : q || hasCamera ? "pr-11" : "pr-3.5")} />
               <span className="absolute top-1/2 right-1.5 flex -translate-y-1/2 items-center">
                 {q && <button type="button" aria-label={t("Clear")} onClick={() => setQ("")} className="grid size-8 place-items-center text-ink-3 hover:text-ink"><X className="size-3.5" /></button>}
                 {hasCamera && <button type="button" aria-label={t("Scan barcode")} title={t("Scan barcode")} onClick={() => setScanOpen(true)} className="grid size-8 place-items-center rounded-lg text-ink-3 hover:text-accent"><ScanBarcode className="size-4" /></button>}
               </span>
             </div>
-            <Button aria-expanded={showFilters} onClick={() => setShowFilters((s) => !s)}>
-              <Filter className="size-4" /> {t("Filters")}
+            {/* Icon only on phones, so the sort menu keeps room for its label. */}
+            <Button aria-expanded={showFilters} onClick={() => setShowFilters((s) => !s)} title={t("Filters")} className="shrink-0 max-sm:px-3">
+              <Filter className="size-4" /> <span className="max-sm:sr-only">{t("Filters")}</span>
               {count > 0 && <span className="code ml-0.5 rounded-[3px] bg-accent px-1 text-[11px] text-on-accent">{count}</span>}
             </Button>
-            <Select aria-label={t("Sort by")} className="w-[160px] max-sm:flex-1" value={`${sort.key}:${sort.dir}`} onChange={(e) => {
+            <Select aria-label={t("Sort by")} className="w-[160px] max-sm:w-auto max-sm:min-w-0 max-sm:flex-1" value={`${sort.key}:${sort.dir}`} onChange={(e) => {
               const [key, dir] = e.target.value.split(":") as [SortKey, "asc" | "desc"];
               setSortP({ key, dir });
             }}>
@@ -195,11 +198,11 @@ export function CollectionView() {
               <option value="date:desc">{t("Latest purchase")}</option>
               {!["added", "airline", "aircraft", "type", "value", "price", "date"].includes(sort.key) && <option value={`${sort.key}:${sort.dir}`}>{t("Custom column")}</option>}
             </Select>
-            <div role="group" aria-label={t("View")} className="flex rounded-md border border-line-strong bg-surface">
-              <button type="button" aria-label={t("Grid view")} aria-pressed={view === "grid"} onClick={() => setViewP("grid")} className={cx("grid h-[34px] w-9 place-items-center rounded-l-md max-md:h-[42px]", view === "grid" ? "bg-surface-2 text-ink" : "text-ink-3")}><LayoutGrid className="size-4" /></button>
-              <button type="button" aria-label={t("Table view")} aria-pressed={view === "table"} onClick={() => setViewP("table")} className={cx("grid h-[34px] w-9 place-items-center rounded-r-md max-md:h-[42px]", view === "table" ? "bg-surface-2 text-ink" : "text-ink-3")}><Rows3 className="size-4" /></button>
+            <div role="group" aria-label={t("View")} className="flex shrink-0 rounded-full border border-line bg-surface p-[3px] shadow-[var(--shadow-sm)]">
+              <button type="button" aria-label={t("Grid view")} aria-pressed={view === "grid"} onClick={() => setViewP("grid")} className={cx("grid h-8 w-9 place-items-center rounded-full transition-colors max-md:h-9", view === "grid" ? "bg-surface-2 text-ink" : "text-ink-3")}><LayoutGrid className="size-4" /></button>
+              <button type="button" aria-label={t("Table view")} aria-pressed={view === "table"} onClick={() => setViewP("table")} className={cx("grid h-8 w-9 place-items-center rounded-full transition-colors max-md:h-9", view === "table" ? "bg-surface-2 text-ink" : "text-ink-3")}><Rows3 className="size-4" /></button>
             </div>
-            <Button aria-label={t("Export")} onClick={() => setExportOpen(true)}><Download className="size-4" /></Button>
+            <Button aria-label={t("Export")} title={t("Export")} onClick={() => setExportOpen(true)} className="w-10 shrink-0 px-0 max-md:w-11"><Download className="size-4" /></Button>
           </div>
 
           {showFilters && <FilterPanel filters={filters} setFilters={setFilters} options={options} statusTab={statusTab} setStatusTab={setStatusTab} />}
