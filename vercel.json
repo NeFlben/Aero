@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "npm install --legacy-peer-deps",
+  "regions": ["fra1"],
   "crons": [{ "path": "/api/cron/market", "schedule": "0 4 * * *" }]
 }
