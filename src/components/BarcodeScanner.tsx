@@ -1,6 +1,6 @@
 "use client";
 
-import { ScanBarcode } from "lucide-react";
+import { Camera, ScanBarcode } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { normBarcode, validGtin } from "@/lib/smart";
@@ -48,7 +48,44 @@ async function focusClose(stream: MediaStream) {
   } catch {}
 }
 
-export const cameraAvailable = () => typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
+const errText = (e: unknown) => (e instanceof Error ? `${e.name}: ${e.message}` : String(e)).slice(0, 80);
+
+/**
+ * Reads a code from a photo. Tries the native reader and ZXing, each on the full picture, on a
+ * smaller copy (phone photos are 12+ MP, which hides thin bars) and turned by 90° (box held upright).
+ */
+async function codeFromPhoto(file: File): Promise<string | null> {
+  const bitmap = await createImageBitmap(file);
+  const variants: HTMLCanvasElement[] = [];
+  for (const max of [1600, 2600]) {
+    for (const turn of [false, true]) {
+      const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+      const w = Math.round(bitmap.width * scale), h = Math.round(bitmap.height * scale);
+      const c = document.createElement("canvas");
+      c.width = turn ? h : w;
+      c.height = turn ? w : h;
+      const g = c.getContext("2d")!;
+      if (turn) {
+        g.translate(h, 0);
+        g.rotate(Math.PI / 2);
+      }
+      g.drawImage(bitmap, 0, 0, w, h);
+      variants.push(c);
+    }
+  }
+  bitmap.close();
+  const detectors = [await nativeDetector(), await zxingDetector()].filter((d): d is Detector => !!d);
+  for (const c of variants) {
+    for (const d of detectors) {
+      const found = await d.detect(c as unknown as HTMLVideoElement).catch(() => []);
+      const code = found.map((f) => normBarcode(f.rawValue)).find((x) => x.length >= 6);
+      if (code) return code;
+    }
+  }
+  return null;
+}
+
+export const cameraAvailable =() => typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
 
 /** Full-screen on phones. Returns the code once it was read twice in a row, which filters out misreads. */
 export function BarcodeScanner({ open, onClose, onCode }: { open: boolean; onClose: () => void; onCode: (code: string) => void }) {
@@ -65,15 +102,33 @@ function ScannerBody({ onClose, onCode }: { onClose: () => void; onCode: (code: 
   const video = useRef<HTMLVideoElement>(null);
   const [state, setState] = useState<"starting" | "scanning" | "failed">("starting");
   const [manual, setManual] = useState("");
+  const [photo, setPhoto] = useState<"idle" | "reading" | "none">("idle");
+  // Small status line: which reader runs, how many frames it checked, the last error. It shows at
+  // a glance whether the scanner is working at all when a code is not picked up.
+  const [status, setStatus] = useState("");
+  const stats = useRef({ engine: "", frames: 0, error: "" });
+  const stopLive = useRef(() => {});
   const done = useRef(onCode);
   useEffect(() => {
     done.current = onCode;
   }, [onCode]);
 
   useEffect(() => {
+    const id = window.setInterval(() => {
+      const s = stats.current;
+      setStatus(s.engine ? `${s.engine} · ${s.frames}${s.error ? ` · ${s.error}` : ""}` : "");
+    }, 500);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
     let stream: MediaStream | null = null;
     let timer = 0;
     let stopped = false;
+    stopLive.current = () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
     // How often each code was read in the last moments. Frames without a hit are common (blur,
     // glare), so reads need not be consecutive; a valid EAN/UPC check digit is accepted at once.
     const hits = new Map<string, number>();
@@ -90,6 +145,7 @@ function ScannerBody({ onClose, onCode }: { onClose: () => void; onCode: (code: 
         // without a hit and takes every other frame (it reads small or skewed codes the native one misses).
         let zxing: Detector | null = native ? null : await zxingDetector();
         if (stopped) return;
+        stats.current.engine = native ? "Android" : "ZXing";
         setState("scanning");
         const started = Date.now();
         let frame = 0;
@@ -99,10 +155,14 @@ function ScannerBody({ onClose, onCode }: { onClose: () => void; onCode: (code: 
           if (v.readyState >= 2) {
             if (native && !zxing && !zxingLoading && Date.now() - started > 2500) {
               zxingLoading = true;
-              zxingDetector().then((d) => { zxing = d; }, () => {});
+              zxingDetector().then((d) => { zxing = d; stats.current.engine = "Android + ZXing"; }, (e) => { stats.current.error = `ZXing: ${errText(e)}`; });
             }
             const detector = native && (!zxing || frame++ % 2 === 0) ? native : zxing!;
-            const found = await detector.detect(v).catch(() => []);
+            stats.current.frames++;
+            const found = await detector.detect(v).catch((e) => {
+              stats.current.error = errText(e);
+              return [];
+            });
             for (const code of found.map((f) => normBarcode(f.rawValue)).filter((c) => c.length >= 6)) {
               const n = (hits.get(code) ?? 0) + 1;
               hits.set(code, n);
@@ -117,7 +177,8 @@ function ScannerBody({ onClose, onCode }: { onClose: () => void; onCode: (code: 
           timer = window.setTimeout(tick, 100);
         };
         tick();
-      } catch {
+      } catch (e) {
+        stats.current.error = errText(e);
         if (!stopped) setState("failed");
       }
     })();
@@ -131,6 +192,21 @@ function ScannerBody({ onClose, onCode }: { onClose: () => void; onCode: (code: 
   const submitManual = () => {
     const c = normBarcode(manual);
     if (c.length >= 6) onCode(c);
+  };
+
+  /** A still photo from the phone's own camera app: full resolution and proper autofocus. */
+  const readPhoto = async (file: File | undefined) => {
+    if (!file) return;
+    setPhoto("reading");
+    const code = await codeFromPhoto(file).catch((e) => {
+      stats.current.error = errText(e);
+      return null;
+    });
+    if (code) {
+      stopLive.current();
+      navigator.vibrate?.(60);
+      onCode(code);
+    } else setPhoto("none");
   };
 
   return (
@@ -156,6 +232,15 @@ function ScannerBody({ onClose, onCode }: { onClose: () => void; onCode: (code: 
             </p>
           </>
         )}
+        {status && <p className="code pointer-events-none absolute top-2 left-3 text-[10px] text-white/60">{status}</p>}
+      </div>
+      <div className="px-4 pt-3">
+        <label className="flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-accent font-semibold text-white hover:bg-accent-hover">
+          <Camera className="size-4" />
+          {photo === "reading" ? t("Reading photo…") : t("Take a photo of the barcode")}
+          <input type="file" accept="image/*" capture="environment" className="sr-only" disabled={photo === "reading"} onChange={(e) => { void readPhoto(e.target.files?.[0]); e.target.value = ""; }} />
+        </label>
+        {photo === "none" && <p role="status" className="mt-2 text-center text-[13px] text-neg">{t("No barcode found in the photo. Hold the phone a little further away and try again.")}</p>}
       </div>
       <form className="flex gap-2 px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))]" onSubmit={(e) => { e.preventDefault(); submitManual(); }}>
         <Input inputMode="numeric" autoComplete="off" aria-label={t("Or type the number")} placeholder={t("Or type the number")} value={manual} onChange={(e) => setManual(e.target.value)} className="code" />
