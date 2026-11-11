@@ -14,7 +14,6 @@ import { BOX_LABEL, CONDITION_LABEL, formFromItem, formToInput, ItemForm, LIVERY
 import { ChangeStat } from "./Pages";
 import { ImageOrSilhouette, shapeOf } from "./ModelImage";
 import { ImageSearchButton } from "./ImageSearch";
-import { MarketPanel } from "./MarketPanel";
 import { Button, cx, Dialog, EmptyState, Flag, Panel, Reg } from "./ui";
 
 interface Img { id: string; width: number | null; height: number | null; altText: string | null }
@@ -261,7 +260,6 @@ export function Detail({ id }: { id: string }) {
               )}
             </Panel>
           )}
-          <MarketPanel item={item} onValue={refresh} />
           </div>
         </div>
 

@@ -1,24 +1,23 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { HttpError } from "./http";
-import { marketEnabled, search as ebaySearch } from "./market";
 import { MAX_UPLOAD_BYTES } from "./storage";
 
 /**
  * Web image search through an official search API: Serper (Google Images results) or the Brave
- * Search API, or eBay listing photos, whichever is configured.
+ * Search API, whichever is configured.
  */
 export interface ImageHit { image: string; thumb: string; title: string; source: string; page: string; width: number | null; height: number | null }
 
 const serperKey = () => process.env.SERPER_API_KEY?.trim() || "";
 const braveKey = () => process.env.BRAVE_SEARCH_API_KEY?.trim() || "";
 /**
- * Optional search APIs that return results the app can show as a grid: Serper (Google Images), Brave,
- * or eBay listing photos (same free keys as the market prices). Without any of them the picker embeds
+ * Optional search APIs that return results the app can show as a grid: Serper (Google Images) or
+ * Brave. Without either of them the picker embeds
  * Bing Images, so the search runs in the user's own browser.
  */
-export type ImageProvider = "google" | "brave" | "ebay";
-export const imageSearchProvider = (): ImageProvider | null => (serperKey() ? "google" : braveKey() ? "brave" : marketEnabled() ? "ebay" : null);
+export type ImageProvider = "google" | "brave";
+export const imageSearchProvider = (): ImageProvider | null => (serperKey() ? "google" : braveKey() ? "brave" : null);
 
 const cache = new Map<string, { at: number; hits: ImageHit[] }>();
 
@@ -46,20 +45,6 @@ async function searchWith(provider: ImageProvider, q: string, count: number): Pr
     hits = (data.images ?? []).filter((r) => r.imageUrl).map((r) => ({
       image: r.imageUrl!, thumb: r.thumbnailUrl || r.imageUrl!, title: r.title ?? "", source: r.domain || r.source || "", page: r.link ?? "", width: r.imageWidth ?? null, height: r.imageHeight ?? null,
     }));
-  } else if (provider === "ebay") {
-    let found;
-    try {
-      found = await ebaySearch(q);
-    } catch {
-      throw new HttpError(502, "image_search_failed");
-    }
-    // eBay image links carry the size in the name (s-l225); s-l1600 is the full picture.
-    hits = found.filter((s) => s.image?.imageUrl).map((s) => {
-      const src = s.image!.imageUrl;
-      return { image: src.replace(/s-l\d+(\.\w+)$/, "s-l1600$1"), thumb: src.replace(/s-l\d+(\.\w+)$/, "s-l400$1"), title: s.title, source: "eBay", page: s.itemWebUrl, width: null, height: null };
-    });
-    // Several listings of one seller often reuse a picture.
-    hits = hits.filter((h, i) => hits.findIndex((x) => x.image === h.image) === i);
   } else {
     const res = await fetch(`https://api.search.brave.com/res/v1/images/search?q=${encodeURIComponent(q)}&count=10&safesearch=strict`, {
       headers: { "x-subscription-token": braveKey(), accept: "application/json" },

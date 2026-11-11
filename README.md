@@ -43,7 +43,6 @@ Everything is optional locally. See `.env.example`.
 | `BETTER_AUTH_URL` | `http://localhost:3000` | Public URL of the deployment |
 | `HANGAR_AUTH` | off | `on` enables accounts and login. Off means one local user with no login: never deploy publicly like that |
 | `HANGAR_SIGNUP` | open | `off` closes registration, only existing accounts can sign in |
-| `CRON_SECRET` | Market prices refresh on a timer in the server process | Serverless: refresh via `GET /api/cron/market` with `Authorization: Bearer …` |
 | `SMTP_URL`, `MAIL_FROM` | Password reset links are printed in the server log | Real email |
 | `BLOB_READ_WRITE_TOKEN` | Images in `.data/uploads` | Images in a private Vercel Blob store |
 | `ADMIN_EMAILS` | No moderators | Comma-separated accounts that can verify and reject catalog entries |

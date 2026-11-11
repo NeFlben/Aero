@@ -44,8 +44,7 @@ git push -u origin main
 | `HANGAR_AUTH` | `on` |
 | `HANGAR_SIGNUP` | `off` (niemand außer dir kann ein Konto anlegen) |
 | `BETTER_AUTH_SECRET` | langer Zufallswert, siehe unten |
-| `CRON_SECRET` | langer Zufallswert, siehe unten |
-| optional `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`, `EBAY_MARKETPLACE`, `PLANESPOTTERS_CONTACT`, `SERPER_API_KEY` | wie in `.env.local` |
+| optional `PLANESPOTTERS_CONTACT`, `SERPER_API_KEY` | wie in `.env.local` |
 
    Zufallswert erzeugen (PowerShell): `[Convert]::ToBase64String((1..32 | % { Get-Random -Max 256 }))`
 
@@ -86,18 +85,6 @@ Hangar startet dann im Vollbild wie eine App. Langes Drücken auf das Symbol (An
 **Offline:** Die App speichert den zuletzt geladenen Stand auf dem Gerät. Ohne Netz kannst du die Sammlung ansehen und durchsuchen. Ändern geht erst wieder mit Verbindung, ein Hinweis oben zeigt das an.
 
 **Barcode:** Im Hinzufügen-Dialog und in der Sammlungssuche gibt es ein Scan-Symbol. Kennt Hangar den Barcode schon, kommt sofort die Duplikat-Meldung. Sonst öffnet sich das Formular mit der eingetragenen Nummer. Die Kamera funktioniert nur über `https://`.
-
-## 6. eBay-Marktpreise (optional)
-
-Ohne Server im Dauerbetrieb übernimmt ein Zeitplan das Aktualisieren:
-
-- **Automatisch:** Vercel ruft `/api/cron/market` einmal täglich auf (in `vercel.json`, nutzt `CRON_SECRET`). Jeder Aufruf schafft etwa 15 Modelle.
-- **Schneller:** Damit alle Modelle wöchentlich frisch sind, bei **cron-job.org** (kostenlos) einen Job anlegen:
-  - URL: `https://<deine-adresse>/api/cron/market`
-  - Zeitplan: alle 30 Minuten
-  - Unter **Advanced → Headers**: `Authorization` = `Bearer <dein CRON_SECRET>`
-
-Ohne `EBAY_CLIENT_ID` und `EBAY_CLIENT_SECRET` antwortet der Endpunkt nur mit `enabled: false`.
 
 ## Updates
 

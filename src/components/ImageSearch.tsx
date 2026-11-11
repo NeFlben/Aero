@@ -10,7 +10,7 @@ export const webImageSearch = (query: string) => `https://www.google.com/search?
 const bingImages = (query: string) => `https://www.bing.com/images/search?q=${encodeURIComponent(query)}&form=HDRSC2`;
 
 interface Hit { image: string; thumb: string; title: string; source: string; page: string; width: number | null; height: number | null }
-type Result = { enabled: boolean; provider: "google" | "brave" | "ebay" | null; query: string; results: Hit[] };
+type Result = { enabled: boolean; provider: "google" | "brave" | null; query: string; results: Hit[] };
 
 /** Button that opens the image search; `onPick` gets the chosen picture as a file. */
 /** `alt` are simpler fallback searches (registration, airline + type) tried while nothing is found. */
