@@ -126,7 +126,7 @@ const Unsure = ({ children }: { children: ReactNode }) => (
   <span className="mt-1 flex items-center gap-1 text-[11.5px] text-signal"><TriangleAlert className="size-3 shrink-0" />{children}</span>
 );
 
-export function ItemForm({ form, set, errors, unsure, unsureFrom = "search", compact }: { form: FormState; set: (p: Partial<FormState>) => void; errors: Record<string, string>; unsure?: Set<string>; unsureFrom?: "search" | "photo"; compact?: boolean }) {
+export function ItemForm({ form, set, errors, unsure, compact }: { form: FormState; set: (p: Partial<FormState>) => void; errors: Record<string, string>; unsure?: Set<string>; compact?: boolean }) {
   const { t, country, locale } = useI18n();
   const { ref } = useApp();
   const [more, setMore] = useState(!compact);
@@ -134,10 +134,7 @@ export function ItemForm({ form, set, errors, unsure, unsureFrom = "search", com
   const countries = useMemo(() => COUNTRY_CODES.map((c) => ({ c, n: country(c) })).sort((a, b) => a.n.localeCompare(b.n, locale)), [country, locale]);
   const regC = registrationCountry(form.registration);
   const wishlist = form.status === "wishlist" || form.status === "ordered" || form.status === "preordered";
-  const photo = unsureFrom === "photo";
-  const check = photo ? t("Hard to read on the photo or deduced. Please check.") : t("Recognised from your search. Please check.");
-  // Search marks only a few fields; the photo can mark any of them.
-  const mark = (key: string) => photo && unsure?.has(key) ? <Unsure>{check}</Unsure> : null;
+  const check = t("Recognised from your search. Please check.");
 
   return (
     <div className="space-y-3">
@@ -159,7 +156,6 @@ export function ItemForm({ form, set, errors, unsure, unsureFrom = "search", com
             onChange={(v) => set({ modelManufacturerName: v })}
             search={(q) => (ref ? searchMakers(ref.makers, q, 8).map((m) => ({ id: m.id, label: m.name })) : [])}
           />
-          {mark("modelManufacturerName")}
         </Field>
         <Field label={t("Airline")}>
           <Combobox
@@ -172,7 +168,6 @@ export function ItemForm({ form, set, errors, unsure, unsureFrom = "search", com
               set({ airlineName: o.label, airlineId: o.id, countryCode: a?.country ?? form.countryCode });
             }}
           />
-          {mark("airlineName")}
         </Field>
         <Field label={t("Scale")}>
           <div className="flex gap-1">
@@ -181,7 +176,6 @@ export function ItemForm({ form, set, errors, unsure, unsureFrom = "search", com
             ))}
             <Input aria-label={t("Other scale")} value={SCALES.slice(0, 3).includes(form.scale) ? "" : form.scale} onChange={(e) => set({ scale: e.target.value })} placeholder={t("Other")} className="code w-[74px]! shrink-0" />
           </div>
-          {mark("scale")}
         </Field>
         <Field label={t("Registration")} hint={regC ? country(regC) : undefined}>
           <Input
@@ -200,7 +194,7 @@ export function ItemForm({ form, set, errors, unsure, unsureFrom = "search", com
           <Input className="code" spellCheck={false} value={form.itemNumber} onChange={(e) => set({ itemNumber: e.target.value })} placeholder="11045" />
           {unsure?.has("itemNumber") && <Unsure>{check}</Unsure>}
         </Field>
-        <BarcodeField value={form.barcode} onChange={(barcode) => set({ barcode })} note={mark("barcode")} />
+        <BarcodeField value={form.barcode} onChange={(barcode) => set({ barcode })} />
         <Field label={t("Livery Type")}>
           <Select value={form.liveryCategory} onChange={(e) => set({ liveryCategory: e.target.value })}>
             <option value="">—</option>
@@ -209,7 +203,7 @@ export function ItemForm({ form, set, errors, unsure, unsureFrom = "search", com
         </Field>
         <Field label={t("Livery Name")}>
           <Input value={form.liveryName} onChange={(e) => set({ liveryName: e.target.value })} placeholder={t("e.g. Retro 1960s")} />
-          {unsure?.has("liveryName") && <Unsure>{photo ? check : t("Taken from your search text. Remove it if this is not the livery.")}</Unsure>}
+          {unsure?.has("liveryName") && <Unsure>{t("Taken from your search text. Remove it if this is not the livery.")}</Unsure>}
         </Field>
       </div>
 
@@ -287,7 +281,7 @@ export function ItemForm({ form, set, errors, unsure, unsureFrom = "search", com
   );
 }
 
-function BarcodeField({ value, onChange, note }: { value: string; onChange: (v: string) => void; note?: ReactNode }) {
+function BarcodeField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const { t } = useI18n();
   const [scan, setScan] = useState(false);
   const [canScan, setCanScan] = useState(false);
@@ -305,7 +299,6 @@ function BarcodeField({ value, onChange, note }: { value: string; onChange: (v: 
             </button>
           )}
         </div>
-        {note}
       </Field>
       <BarcodeScanner open={scan} onClose={() => setScan(false)} onCode={(c) => { onChange(c); setScan(false); }} />
     </div>

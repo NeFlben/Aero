@@ -178,10 +178,6 @@ dialog { color: inherit; }
 .fade-in { animation: fadein 160ms ease-out both; }
 @keyframes fadein { from { opacity: 0; transform: translateY(3px); } }
 
-/* Box photo being read: a light band sweeps down the picture. */
-.box-scan-line { top: -2.5rem; animation: boxscan 1.8s ease-in-out infinite; }
-@keyframes boxscan { to { top: 100%; } }
-
 .scroll-thin { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 
 @media (prefers-reduced-motion: reduce) {
