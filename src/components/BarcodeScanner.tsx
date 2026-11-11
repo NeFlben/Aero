@@ -9,7 +9,7 @@ import { Button, Dialog, IconClose, Input } from "./ui";
 const FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"];
 
 interface Detector {
-  detect(source: HTMLVideoElement): Promise<{ rawValue: string }[]>;
+  detect(source: HTMLVideoElement | ImageBitmap): Promise<{ rawValue: string }[]>;
 }
 
 /** The browser's own BarcodeDetector (Chrome on Android, Safari on macOS), if it reads product codes. */
@@ -31,6 +31,11 @@ async function zxingDetector(): Promise<Detector> {
   const mod = await import("barcode-detector/ponyfill");
   mod.setZXingModuleOverrides({ locateFile: (path: string, prefix: string) => (path.endsWith(".wasm") ? `/vendor/zxing_reader-${mod.ZXING_WASM_VERSION}.wasm` : prefix + path) });
   return new mod.BarcodeDetector({ formats: FORMATS as never });
+}
+
+/** The native detector where it reads product codes, otherwise ZXing. Used for still images (box photos). */
+export async function createDetector(): Promise<Detector> {
+  return (await nativeDetector()) ?? zxingDetector();
 }
 
 /** Phone cameras often stay focused at a distance; a box held close needs continuous autofocus. */

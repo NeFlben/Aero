@@ -82,7 +82,7 @@ export function formatRegistration(input: string): string {
   return r;
 }
 
-const looksLikeRegistration = (tok: string) => {
+export const looksLikeRegistration = (tok: string) => {
   const t = tok.toUpperCase();
   if (/^[A-Z0-9]{1,3}-[A-Z0-9]{2,5}$/.test(t)) return true;
   return /^N[0-9]{1,5}[A-Z]{0,2}$/.test(t) && t.length >= 4 && /[A-Z]$|^N\d{3,5}$/.test(t);

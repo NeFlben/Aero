@@ -100,9 +100,15 @@ Every item query takes the owner's id (`src/server/items.ts`). Inputs are valida
 
 The in-process rate limiter counts per server instance. With several instances, replace it with a shared store.
 
+## Box photo recognition
+
+Add Aircraft offers "Take a photo of the box" (also Ctrl+V of a photo on the search screen). Up to six photos — ideally every side — are read **on the device**: the barcode with ZXing / the browser's `BarcodeDetector`, the printed text with Tesseract.js (`src/components/BoxScan.tsx`). Nothing is uploaded and no key or paid service is needed. The worker, the WebAssembly core and the English model (~3 MB, loaded on first use, then cached) are copied to `public/vendor/tesseract-<version>/` by `scripts/copy-wasm.mjs`, so no third-party CDN is contacted. A photo with little readable text is tried again turned by 90° and 270° (box sides).
+
+`readBoxText` in `src/lib/boxScan.ts` finds the facts in the recognised text, conservatively: scale ("1:400"), brand, airline and aircraft type as whole-word matches against the reference lists, registrations with a known national prefix, a labelled item number or a brand's number format, barcode digits with a valid check digit, alliance / retro / anniversary hints, limited edition and a few extras (flaps down, gear up, stand). `resolveBoxReading` then gives canonical names and ids. A barcode decoded from the pixels beats digits read as text. A catalog release with the same barcode, or the same brand and item number, fills in the rest; the duplicate check runs as usual. Fields read with low confidence or found by pattern alone are marked in the form, and the box photos are staged as the model's photos (removable before saving).
+
 ## Not in this version
 
-- OCR and AI extraction from photos. Barcode scanning is built with the browser's `BarcodeDetector` (the button is hidden where unsupported); it only finds a release once the catalog holds that barcode.
+- Recognition from photos of the model itself (box photos are covered above). Barcode scanning is built with the browser's `BarcodeDetector` (the button is hidden where unsupported); it only finds a release once the catalog holds that barcode.
 - Automatic market value lookup. `value_history.source` is ready for it.
 - Background removal and purchase receipt uploads.
 - Community tools: merging exists as a moderator API without a UI, and reports are stored without a review screen.
