@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera } from "lucide-react";
+import { Camera, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { Worker } from "tesseract.js";
 import { useI18n } from "@/lib/i18n";
@@ -92,6 +92,31 @@ export async function readBoxPhotos(files: File[], onStep: (step: BoxStep, photo
   }
   onStep("matching", files.length - 1);
   return { pages, barcode };
+}
+
+/** Thumbnails of the photos collected so far, each removable. */
+export function BoxPhotoTray({ files, onRemove }: { files: File[]; onRemove: (i: number) => void }) {
+  const { t } = useI18n();
+  const [urls, setUrls] = useState<string[]>([]);
+  useEffect(() => {
+    const made = files.map((f) => URL.createObjectURL(f));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setUrls(made);
+    return () => made.forEach((u) => URL.revokeObjectURL(u));
+  }, [files]);
+  return (
+    <div className="flex flex-wrap gap-2">
+      {urls.map((u, i) => (
+        <div key={u} className="relative size-16 overflow-hidden rounded-xl bg-surface-2 shadow-[var(--shadow-sm)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={u} alt={t("Photo {n}", { n: i + 1 })} className="size-full object-cover" />
+          <button type="button" aria-label={t("Remove photo")} onClick={() => onRemove(i)} className="absolute top-0.5 right-0.5 grid size-6 place-items-center rounded-full bg-black/60 text-white">
+            <X className="size-3.5" />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /** Shown while the box is being read: the photos with a moving scan line and the current step. */

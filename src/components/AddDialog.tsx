@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, BadgeCheck, Camera, CircleHelp, Copy, ScanBarcode, Search, Sparkles, TriangleAlert } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Camera, CircleHelp, Copy, Images, ScanBarcode, Search, Sparkles, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { readBoxText, resolveBoxReading } from "@/lib/boxScan";
@@ -10,7 +10,7 @@ import { aircraftLabel, type Item, type ItemInput, type ReleaseRef } from "@/lib
 import { api, ApiError, useApp } from "./AppProvider";
 import { blankForm, formFromItem, formToInput, ItemForm, LIVERY_LABEL, type FormState } from "./ItemForm";
 import { BarcodeScanner, cameraAvailable } from "./BarcodeScanner";
-import { BoxScanProgress, readBoxPhotos, type BoxStep } from "./BoxScan";
+import { BoxPhotoTray, BoxScanProgress, readBoxPhotos, type BoxStep } from "./BoxScan";
 
 /** All six sides of a box. */
 const MAX_BOX_PHOTOS = 6;
@@ -83,6 +83,15 @@ function AddFlow({ seed }: { seed: ReturnType<typeof useApp>["addSeed"] }) {
   const [scanInfo, setScanInfo] = useState<{ filled: number; warnings: string[]; release: ReleaseRef | null } | null>(null);
   const [boxStep, setBoxStep] = useState<{ step: BoxStep; photo: number }>({ step: "loading", photo: 0 });
   const boxInput = useRef<HTMLInputElement>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
+  // Box photos collected side by side (camera gives one per tap) until "Read the box".
+  const [boxFiles, setBoxFiles] = useState<File[]>([]);
+  const addBoxFiles = (list: FileList | null) => {
+    const added = Array.from(list ?? []).filter((f) => f.type.startsWith("image/") || f.type === "");
+    if (!added.length) return;
+    setBoxError(null);
+    setBoxFiles((f) => [...f, ...added].slice(0, MAX_BOX_PHOTOS));
+  };
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -441,23 +450,33 @@ function AddFlow({ seed }: { seed: ReturnType<typeof useApp>["addSeed"] }) {
               className="h-12 w-full rounded-md border border-line-strong bg-surface pr-3 pl-9 text-[15px] placeholder:text-ink-3 focus:border-accent focus:ring-1 focus:ring-accent focus:outline-none max-md:text-base"
             />
           </div>
-          <Button className="h-12 w-12 shrink-0 px-0" aria-label={t("Photo of the box")} title={t("Photo of the box")} onClick={() => boxInput.current?.click()}><Camera className="size-5" /></Button>
+          <Button className="h-12 w-12 shrink-0 px-0" aria-label={t("Photo of the box")} title={t("Photo of the box")} disabled={boxFiles.length >= MAX_BOX_PHOTOS} onClick={() => cameraInput.current?.click()}><Camera className="size-5" /></Button>
           {hasCamera && <Button className="h-12 w-12 shrink-0 px-0" aria-label={t("Scan barcode")} title={t("Scan barcode")} onClick={() => setScanOpen(true)}><ScanBarcode className="size-5" /></Button>}
         </div>
-        <input ref={boxInput} type="file" accept="image/*" multiple hidden aria-label={t("Photo of the box")} onChange={(e) => { void scanBox(e.target.files); e.target.value = ""; }} />
+        {/* capture opens the camera straight away (one photo per tap); the gallery input allows several at once. */}
+        <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden aria-label={t("Take a photo")} onChange={(e) => { addBoxFiles(e.target.files); e.target.value = ""; }} />
+        <input ref={boxInput} type="file" accept="image/*" multiple hidden aria-label={t("From gallery")} onChange={(e) => { addBoxFiles(e.target.files); e.target.value = ""; }} />
         {boxError && (
           <p role="alert" className="fade-in mt-3 flex items-start gap-2 rounded-2xl bg-surface-2 px-3.5 py-2.5 text-[13px] text-neg">
             <TriangleAlert className="mt-0.5 size-4 shrink-0" />{boxError}
           </p>
         )}
-        {!q.trim() && !draftFound && (
-          <button type="button" onClick={() => boxInput.current?.click()} className="mt-3 flex w-full items-center gap-3 rounded-2xl border border-dashed border-line-strong px-4 py-3 text-left transition-colors hover:border-accent hover:bg-accent-soft">
-            <span className="grad grid size-10 shrink-0 place-items-center rounded-full text-white"><Camera className="size-5" /></span>
-            <span className="min-w-0">
-              <span className="block font-semibold">{t("Take a photo of the box")}</span>
-              <span className="block text-[12.5px] text-ink-2">{t("Photograph every side. Brand, item number, scale, airline, type, registration and barcode are read on this device and filled in. Up to 6 photos.")}</span>
-            </span>
-          </button>
+        {(boxFiles.length > 0 || (!q.trim() && !draftFound)) && (
+          <div className="mt-3 rounded-2xl border border-dashed border-line-strong px-4 py-3">
+            <div className="flex items-center gap-3">
+              <span className="grad grid size-10 shrink-0 place-items-center rounded-full text-white"><Camera className="size-5" /></span>
+              <span className="min-w-0">
+                <span className="block font-semibold">{boxFiles.length ? t("{n} of {max} photos", { n: boxFiles.length, max: MAX_BOX_PHOTOS }) : t("Take a photo of the box")}</span>
+                <span className="block text-[12.5px] text-ink-2">{boxFiles.length ? t("Add more sides, then read the box.") : t("Photograph every side. Brand, item number, scale, airline, type, registration and barcode are read on this device and filled in. Up to 6 photos.")}</span>
+              </span>
+            </div>
+            {boxFiles.length > 0 && <div className="mt-3"><BoxPhotoTray files={boxFiles} onRemove={(i) => setBoxFiles((f) => f.filter((_, j) => j !== i))} /></div>}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button disabled={boxFiles.length >= MAX_BOX_PHOTOS} onClick={() => cameraInput.current?.click()}><Camera className="size-4" /> {boxFiles.length ? t("Next side") : t("Take a photo")}</Button>
+              <Button disabled={boxFiles.length >= MAX_BOX_PHOTOS} onClick={() => boxInput.current?.click()}><Images className="size-4" /> {t("From gallery")}</Button>
+              {boxFiles.length > 0 && <Button variant="primary" className="max-sm:w-full" onClick={() => { const f = boxFiles; setBoxFiles([]); void scanBox(f); }}><Sparkles className="size-4" /> {t("Read the box")}</Button>}
+            </div>
+          </div>
         )}
         {draftFound && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface-2 px-3 py-2 text-[13px]">
