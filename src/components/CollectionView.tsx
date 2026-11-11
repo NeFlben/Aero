@@ -170,14 +170,13 @@ export function CollectionView() {
         <>
           <div className="z-10 -mx-4 mb-3 flex flex-wrap items-center gap-2 px-4 py-2 md:sticky md:top-0 md:-mx-7 md:bg-bg/95 md:px-7 md:backdrop-blur">
             {/* Phone: the search takes its own row; the controls share the row below. */}
-            <div className="relative min-w-0 basis-full sm:min-w-[200px] sm:basis-0 sm:flex-1">
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" />
-              {/* Right padding reserves room for the clear and scan buttons so typed text never runs under them. */}
-              <Input type="search" enterKeyHint="search" aria-label={t("Search your collection")} value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Search your collection")} className={cx("truncate pl-9 [&::-webkit-search-cancel-button]:appearance-none", q && hasCamera ? "pr-[76px]" : q || hasCamera ? "pr-11" : "pr-3.5")} />
-              <span className="absolute top-1/2 right-1.5 flex -translate-y-1/2 items-center">
-                {q && <button type="button" aria-label={t("Clear")} onClick={() => setQ("")} className="grid size-8 place-items-center text-ink-3 hover:text-ink"><X className="size-3.5" /></button>}
-                {hasCamera && <button type="button" aria-label={t("Scan barcode")} title={t("Scan barcode")} onClick={() => setScanOpen(true)} className="grid size-8 place-items-center rounded-lg text-ink-3 hover:text-accent"><ScanBarcode className="size-4" /></button>}
-              </span>
+            {/* Icon, text and buttons sit side by side in one flex row instead of being layered over the
+                input, so nothing can overlap — iOS Safari ignores the padding of type="search" fields. */}
+            <div className="flex h-10 min-w-0 basis-full items-center rounded-xl border border-line bg-surface pr-1 pl-3 shadow-[var(--shadow-sm)] focus-within:border-accent focus-within:ring-4 focus-within:ring-accent/15 max-md:h-11 sm:min-w-[200px] sm:basis-0 sm:flex-1">
+              <Search aria-hidden className="pointer-events-none size-4 shrink-0 text-ink-3" />
+              <input type="search" enterKeyHint="search" aria-label={t("Search your collection")} value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Search your collection")} className="h-full w-full min-w-0 flex-1 appearance-none truncate border-0 bg-transparent px-2 text-sm text-ink placeholder:text-ink-3 focus-visible:outline-none! max-md:text-base [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none" />
+              {q && <button type="button" aria-label={t("Clear")} onClick={() => setQ("")} className="grid size-8 shrink-0 place-items-center text-ink-3 hover:text-ink"><X className="size-3.5" /></button>}
+              {hasCamera && <button type="button" aria-label={t("Scan barcode")} title={t("Scan barcode")} onClick={() => setScanOpen(true)} className="grid size-8 shrink-0 place-items-center rounded-lg text-ink-3 hover:text-accent"><ScanBarcode className="size-4" /></button>}
             </div>
             {/* Icon only on phones, so the sort menu keeps room for its label. */}
             <Button aria-expanded={showFilters} onClick={() => setShowFilters((s) => !s)} title={t("Filters")} className="shrink-0 max-sm:px-3">
